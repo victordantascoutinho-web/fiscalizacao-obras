@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Fiscalização de Obras</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f0; color: #2c2c2a; line-height: 1.5; min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+  .header { background: #fff; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; border: 1px solid rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .header h1 { font-size: 20px; font-weight: 600; color: #2c2c2a; }
+  .header h1 i { color: #185FA5; margin-right: 8px; }
+  .user-info { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5F5E5A; }
+  .user-info .avatar { width: 32px; height: 32px; border-radius: 50%; background: #E6F1FB; color: #0C447C; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+  .btn-logout { background: transparent; border: 1px solid rgba(0,0,0,0.15); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #5F5E5A; }
+  .btn-logout:hover { background: #f5f5f0; }
+  .card { background: #fff; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid rgba(0,0,0,0.08); }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 1rem; color: #2c2c2a; display: flex; align-items: center; gap: 8px; }
+  .card-title i { color: #185FA5; }
+  .form-group { margin-bottom: 1rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; font-weight: 500; color: #444441; margin-bottom: 6px; }
+  input, select, textarea { width: 100%; padding: 9px 12px; border: 1px solid rgba(0,0,0,0.15); border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; color: #2c2c2a; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #378ADD; box-shadow: 0 0 0 3px rgba(55,138,221,0.15); }
+  textarea { resize: vertical; min-height: 70px; }
+  .btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; }
+  .btn-primary { background: #185FA5; color: #fff; }
+  .btn-primary:hover { background: #0C447C; }
+  .btn-primary:disabled { background: #B4B2A9; cursor: not-allowed; }
+  .btn-secondary { background: #fff; color: #444441; border: 1px solid rgba(0,0,0,0.15); }
+  .btn-secondary:hover { background: #f5f5f0; }
+  .btn-large { padding: 12px 28px; font-size: 15px; }
+  .login-wrapper { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
+  .login-card { background: #fff; padding: 2.5rem; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); max-width: 420px; width: 100%; text-align: center; }
+  .login-card .icon-big { width: 64px; height: 64px; border-radius: 50%; background: #E6F1FB; color: #185FA5; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 32px; }
+  .login-card h2 { font-size: 22px; margin-bottom: 4px; }
+  .login-card p { color: #5F5E5A; font-size: 14px; margin-bottom: 1.5rem; }
+  .obra-list { display: flex; flex-direction: column; gap: 8px; }
+  .obra-item { background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; padding: 1rem 1.25rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.15s; gap: 10px; }
+  .obra-item:hover { border-color: #378ADD; background: #fafaf7; }
+  .obra-info { flex: 1; min-width: 0; }
+  .obra-info h3 { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .obra-info p { font-size: 13px; color: #5F5E5A; }
+  .obra-status { font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 500; white-space: nowrap; }
+  .status-em-dia { background: #EAF3DE; color: #3B6D11; }
+  .status-atrasada { background: #FAEEDA; color: #854F0B; }
+  .status-paralisada { background: #FCEBEB; color: #A32D2D; }
+  .status-concluida { background: #E6F1FB; color: #0C447C; }
+  .status-nao-iniciada { background: #F1EFE8; color: #5F5E5A; }
+  .last-update { background: #FAEEDA; border: 1px solid #FAC775; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+  .last-update-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #633806; margin-bottom: 8px; }
+  .last-update-meta { font-size: 13px; color: #633806; margin-bottom: 8px; }
+  .last-update-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px; color: #2c2c2a; }
+  @media (max-width: 600px) { .last-update-grid { grid-template-columns: 1fr; } }
+  .history-item { background: #fafaf7; border: 1px solid rgba(0,0,0,0.08); border-radius: 8px; padding: 1rem; margin-bottom: 8px; }
+  .history-meta { font-size: 12px; color: #5F5E5A; margin-bottom: 6px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .history-content { font-size: 13px; color: #2c2c2a; }
+  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
+  .back-link { background: none; border: none; color: #185FA5; cursor: pointer; font-size: 14px; padding: 0; margin-bottom: 1rem; display: inline-flex; align-items: center; gap: 4px; }
+  .back-link:hover { text-decoration: underline; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #1D9E75; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transform: translateY(10px); transition: all 0.3s; z-index: 100; max-width: 90%; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: #A32D2D; }
+  .empty-state { text-align: center; padding: 2rem; color: #5F5E5A; }
+  .empty-state i { font-size: 40px; color: #B4B2A9; margin-bottom: 8px; }
+  .loading { text-align: center; padding: 2rem; color: #5F5E5A; }
+  .field-display { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .field-display:last-child { border-bottom: none; }
+  .field-display strong { display: block; font-size: 12px; color: #5F5E5A; margin-bottom: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
+  .field-display span { font-size: 14px; color: #2c2c2a; }
+  .config-alert { background: #FCEBEB; border: 1px solid #F09595; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; color: #501313; }
+  .config-alert h3 { font-size: 14px; margin-bottom: 6px; }
+  .config-alert p { font-size: 13px; }
+  .photo-link { display: inline-flex; align-items: center; gap: 4px; color: #185FA5; text-decoration: none; font-size: 13px; margin-right: 12px; margin-top: 6px; }
+  .photo-link:hover { text-decoration: underline; }
+  .help-text { font-size: 12px; color: #5F5E5A; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="container" id="app">
+  <div class="loading">Carregando...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CONFIGURAÇÃO — VOCÊ PRECISA PREENCHER ESTES 2 VALORES           ║
+// ║  Pegue eles no painel do Supabase (instruções no guia)           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+const SUPABASE_URL = 'https://hafvlgjndsejthntkcyl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhZnZsZ2puZHNlanRobnRrY3lsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTAxODMsImV4cCI6MjA5NDQyNjE4M30.UP9e4QM2ooKWSmReGRO96maQ-m8H0hxUW1eqt-ydT9E';
+// ════════════════════════════════════════════════════════════════════
+
+let supabase = null;
+let CONFIGURADO = false;
+
+if (SUPABASE_URL && SUPABASE_URL !== 'COLE_AQUI_A_URL_DO_SUPABASE' &&
+    SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'COLE_AQUI_A_CHAVE_ANON_DO_SUPABASE') {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  CONFIGURADO = true;
+}
+
+let state = { fiscal: null, view: 'login', obraSelecionada: null, obras: [] };
+
+async function carregarObras() {
+  const { data, error } = await supabase.from('obras').select('*').order('nome');
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function carregarUltimoRegistro(obraId) {
+  const { data, error } = await supabase.from('registros').select('*').eq('obra_id', obraId).order('atualizado_em', { ascending: false }).limit(1);
+  if (error) { console.error(error); return null; }
+  return data && data[0] ? data[0] : null;
+}
+
+async function carregarHistorico(obraId) {
+  const { data, error } = await supabase.from('registros').select('*').eq('obra_id', obraId).order('atualizado_em', { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data || [];
+}
+
+async function salvarRegistro(obraId, dados, fiscal) {
+  const agora = new Date();
+  const hoje = agora.toISOString().split('T')[0];
+  const { data: existentes } = await supabase.from('registros').select('id').eq('obra_id', obraId).eq('fiscal', fiscal).gte('atualizado_em', hoje + 'T00:00:00').lte('atualizado_em', hoje + 'T23:59:59');
+  if (existentes && existentes.length > 0) {
+    const ids = existentes.map(r => r.id);
+    await supabase.from('registros').delete().in('id', ids);
+  }
+  const novoRegistro = {
+    obra_id: obraId, fiscal: fiscal, atualizado_em: agora.toISOString(),
+    status_geral: dados.statusGeral, percentual_fisico: parseInt(dados.percentualFisico) || 0,
+    contratada: dados.contratada || null, etapa_atual: dados.etapaAtual || null,
+    prazo_previsto: dados.prazoPrevisto || null, previsao_atual: dados.previsaoAtual || null,
+    efetivo: dados.efetivo || null, situacao_materiais: dados.situacaoMateriais || null,
+    pendencias: dados.pendencias || null, observacoes: dados.observacoes || null,
+    link_fotos: dados.linkFotos || null,
+  };
+  const { error } = await supabase.from('registros').insert(novoRegistro);
+  if (error) throw error;
+  return novoRegistro;
+}
+
+async function init() {
+  if (!CONFIGURADO) { renderTelaConfiguracao(); return; }
+  state.obras = await carregarObras();
+  const fiscalSalvo = sessionStorage.getItem('fiscal_atual');
+  if (fiscalSalvo) { state.fiscal = fiscalSalvo; state.view = 'obras'; }
+  render();
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+function formatDateOnly(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function getIniciais(nome) { return nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2); }
+function toast(msg, tipo) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (tipo === 'error' ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function labelStatus(s) {
+  return { 'em-dia': '✓ Em dia', 'atrasada': '⚠ Atrasada', 'paralisada': '⛔ Paralisada', 'concluida': '✓ Concluída' }[s] || '—';
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (state.view === 'login') app.innerHTML = renderLogin();
+  else if (state.view === 'obras') renderObras();
+  else if (state.view === 'form') renderForm();
+  else if (state.view === 'historico') renderHistorico();
+}
+
+function renderTelaConfiguracao() {
+  document.getElementById('app').innerHTML = `
+    <div class="login-wrapper">
+      <div class="login-card" style="max-width: 520px; text-align: left;">
+        <div class="icon-big" style="margin: 0 auto 1rem;"><i class="ti ti-settings"></i></div>
+        <h2 style="text-align: center;">Configuração necessária</h2>
+        <p style="text-align: center;">O sistema ainda não está conectado ao banco de dados</p>
+        <div class="config-alert" style="margin-top: 1rem;">
+          <h3><i class="ti ti-info-circle"></i> O que fazer</h3>
+          <p style="margin-top: 6px;">Abra este arquivo num editor de texto (como o Bloco de Notas) e procure por <strong>SUPABASE_URL</strong> e <strong>SUPABASE_ANON_KEY</strong>.</p>
+          <p style="margin-top: 8px;">Substitua os valores entre aspas pelos que você copiou do painel do Supabase. Veja o guia de instalação para o passo a passo completo.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLogin() {
+  return `
+    <div class="login-wrapper">
+      <div class="login-card">
+        <div class="icon-big"><i class="ti ti-shield-check"></i></div>
+        <h2>Fiscalização de Obras</h2>
+        <p>Identifique-se para acessar o sistema</p>
+        <div class="form-group" style="text-align: left;">
+          <label>Nome do fiscal</label>
+          <input type="text" id="input-fiscal" placeholder="Digite seu nome completo" autocomplete="off">
+        </div>
+        <button class="btn btn-primary btn-large" style="width: 100%; justify-content: center;" onclick="fazerLogin()">
+          <i class="ti ti-login-2"></i> Entrar
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+window.fazerLogin = function() {
+  const nome = document.getElementById('input-fiscal').value.trim();
+  if (!nome) { toast('Digite seu nome para entrar', 'error'); return; }
+  if (nome.length < 3) { toast('Nome muito curto', 'error'); return; }
+  state.fiscal = nome;
+  sessionStorage.setItem('fiscal_atual', nome);
+  state.view = 'obras';
+  render();
+};
+
+window.fazerLogout = function() {
+  state.fiscal = null;
+  sessionStorage.removeItem('fiscal_atual');
+  state.view = 'login';
+  render();
+};
+
+function renderHeader() {
+  return `
+    <div class="header">
+      <h1><i class="ti ti-shield-check"></i> Fiscalização de Obras</h1>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="user-info">
+          <div class="avatar">${escapeHtml(getIniciais(state.fiscal))}</div>
+          <span>${escapeHtml(state.fiscal)}</span>
+        </div>
+        <button class="btn-logout" onclick="fazerLogout()"><i class="ti ti-logout"></i> Sair</button>
+      </div>
+    </div>
+  `;
+}
+
+async function renderObras() {
+  const app = document.getElementById('app');
+  app.innerHTML = `${renderHeader()}<div class="card"><div class="card-title"><i class="ti ti-building"></i> Selecione uma obra para atualizar</div><div class="obra-list" id="obra-list"><div class="loading">Carregando obras...</div></div></div>`;
+  state.obras = await carregarObras();
+  const lista = document.getElementById('obra-list');
+  if (state.obras.length === 0) {
+    lista.innerHTML = `<div class="empty-state"><i class="ti ti-inbox"></i><p>Nenhuma obra cadastrada ainda</p><p style="font-size: 12px; margin-top: 6px;">Cadastre obras no painel do Supabase, na tabela "obras"</p></div>`;
+    return;
+  }
+  const itens = await Promise.all(state.obras.map(async (obra) => {
+    const ultimo = await carregarUltimoRegistro(obra.id);
+    const status = ultimo ? ultimo.status_geral : 'nao-iniciada';
+    const statusLabel = { 'em-dia': 'Em dia', 'atrasada': 'Atrasada', 'paralisada': 'Paralisada', 'concluida': 'Concluída', 'nao-iniciada': 'Sem registro' }[status] || 'Sem registro';
+    const dataInfo = ultimo ? `Última: ${formatDate(ultimo.atualizado_em)} por ${escapeHtml(ultimo.fiscal)}` : 'Nenhum registro ainda';
+    return `<div class="obra-item" onclick="abrirObra('${obra.id}')"><div class="obra-info"><h3>${escapeHtml(obra.nome)}</h3><p><i class="ti ti-map-pin" style="font-size:12px"></i> ${escapeHtml(obra.localizacao || '')} · ${dataInfo}</p></div><span class="obra-status status-${status}">${statusLabel}</span></div>`;
+  }));
+  lista.innerHTML = itens.join('');
+}
+
+window.abrirObra = function(obraId) {
+  state.obraSelecionada = state.obras.find(o => o.id == obraId);
+  state.view = 'form';
+  render();
+};
+
+async function renderForm() {
+  const app = document.getElementById('app');
+  app.innerHTML = `${renderHeader()}<div class="loading">Carregando dados da obra...</div>`;
+  const obra = state.obraSelecionada;
+  const ultimo = await carregarUltimoRegistro(obra.id);
+  let ultimaHtml = '';
+  if (ultimo) {
+    const fotosHtml = ultimo.link_fotos ? `<div style="margin-top: 8px;"><a href="${escapeHtml(ultimo.link_fotos)}" target="_blank" class="photo-link"><i class="ti ti-photo"></i> Ver fotos da última visita</a></div>` : '';
+    ultimaHtml = `
+      <div class="last-update">
+        <div class="last-update-header"><i class="ti ti-history"></i> Última atualização registrada</div>
+        <div class="last-update-meta"><strong>${escapeHtml(ultimo.fiscal)}</strong> em ${formatDate(ultimo.atualizado_em)}</div>
+        <div class="last-update-grid">
+          <div><strong>Status:</strong> ${labelStatus(ultimo.status_geral)}</div>
+          <div><strong>% Físico:</strong> ${ultimo.percentual_fisico || 0}%</div>
+          <div><strong>Etapa atual:</strong> ${escapeHtml(ultimo.etapa_atual || '—')}</div>
+          <div><strong>Efetivo:</strong> ${escapeHtml(ultimo.efetivo || '—')}</div>
+          <div><strong>Prazo previsto:</strong> ${formatDateOnly(ultimo.prazo_previsto)}</div>
+          <div><strong>Previsão atual:</strong> ${formatDateOnly(ultimo.previsao_atual)}</div>
+          <div><strong>Contratada:</strong> ${escapeHtml(ultimo.contratada || '—')}</div>
+          <div><strong>Materiais:</strong> ${escapeHtml(ultimo.situacao_materiais || '—')}</div>
+        </div>
+        ${ultimo.observacoes ? `<div style="margin-top: 10px; font-size: 13px;"><strong>Observações:</strong> ${escapeHtml(ultimo.observacoes)}</div>` : ''}
+        ${ultimo.pendencias ? `<div style="margin-top: 6px; font-size: 13px;"><strong>Pendências:</strong> ${escapeHtml(ultimo.pendencias)}</div>` : ''}
+        ${fotosHtml}
+      </div>`;
+  } else {
+    ultimaHtml = `<div class="last-update" style="background: #F1EFE8; border-color: #D3D1C7;"><div class="last-update-header" style="color: #5F5E5A;"><i class="ti ti-info-circle"></i> Nenhum registro anterior para esta obra</div><div style="font-size: 13px; color: #5F5E5A;">Este será o primeiro registro de fiscalização.</div></div>`;
+  }
+  const v = ultimo || {};
+  app.innerHTML = `
+    ${renderHeader()}
+    <button class="back-link" onclick="voltarLista()"><i class="ti ti-arrow-left"></i> Voltar para lista de obras</button>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-building"></i> ${escapeHtml(obra.nome)}</div>
+      <div style="font-size: 13px; color: #5F5E5A; margin-bottom: 1rem;"><i class="ti ti-map-pin"></i> ${escapeHtml(obra.localizacao || '')}</div>
+      ${ultimaHtml}
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-edit"></i> Nova atualização de status</div>
+      <p style="font-size: 13px; color: #5F5E5A; margin-bottom: 1rem;">Os campos vêm preenchidos com a última informação. Atualize o que mudou e salve.</p>
+      <form onsubmit="event.preventDefault(); salvar();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status geral *</label>
+            <select id="statusGeral" required>
+              <option value="">Selecione...</option>
+              <option value="em-dia" ${v.status_geral==='em-dia'?'selected':''}>Em dia</option>
+              <option value="atrasada" ${v.status_geral==='atrasada'?'selected':''}>Atrasada</option>
+              <option value="paralisada" ${v.status_geral==='paralisada'?'selected':''}>Paralisada</option>
+              <option value="concluida" ${v.status_geral==='concluida'?'selected':''}>Concluída</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>% Físico executado *</label>
+            <input type="number" id="percentualFisico" min="0" max="100" step="1" value="${v.percentual_fisico ?? ''}" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Empresa contratada</label>
+          <input type="text" id="contratada" value="${escapeHtml(v.contratada || '')}" placeholder="Razão social da empresa executora">
+        </div>
+        <div class="form-group">
+          <label>Etapa atual da obra</label>
+          <input type="text" id="etapaAtual" value="${escapeHtml(v.etapa_atual || '')}" placeholder="Ex: Fundação, Estrutura, Acabamento...">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Prazo originalmente previsto</label>
+            <input type="date" id="prazoPrevisto" value="${v.prazo_previsto || ''}">
+          </div>
+          <div class="form-group">
+            <label>Previsão atual de conclusão</label>
+            <input type="date" id="previsaoAtual" value="${v.previsao_atual || ''}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Efetivo no canteiro</label>
+            <input type="text" id="efetivo" value="${escapeHtml(v.efetivo || '')}" placeholder="Ex: 12 trabalhadores">
+          </div>
+          <div class="form-group">
+            <label>Situação dos materiais</label>
+            <select id="situacaoMateriais">
+              <option value="">Selecione...</option>
+              <option value="Adequada" ${v.situacao_materiais==='Adequada'?'selected':''}>Adequada</option>
+              <option value="Parcial" ${v.situacao_materiais==='Parcial'?'selected':''}>Parcial</option>
+              <option value="Insuficiente" ${v.situacao_materiais==='Insuficiente'?'selected':''}>Insuficiente</option>
+              <option value="Aguardando entrega" ${v.situacao_materiais==='Aguardando entrega'?'selected':''}>Aguardando entrega</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Pendências identificadas</label>
+          <textarea id="pendencias" placeholder="Liste pendências, problemas ou irregularidades observadas">${escapeHtml(v.pendencias || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Observações gerais</label>
+          <textarea id="observacoes" placeholder="Informações relevantes da visita">${escapeHtml(v.observacoes || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Link das fotos (opcional)</label>
+          <input type="url" id="linkFotos" value="${escapeHtml(v.link_fotos || '')}" placeholder="Cole o link da pasta no Google Drive, Imgur, etc">
+          <div class="help-text">Suba as fotos em qualquer serviço (Google Drive, Imgur) e cole o link aqui</div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-secondary" onclick="verHistorico()"><i class="ti ti-history"></i> Ver histórico</button>
+          <button type="submit" class="btn btn-primary" id="btn-salvar"><i class="ti ti-device-floppy"></i> Salvar atualização</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+window.salvar = async function() {
+  const dados = {
+    statusGeral: document.getElementById('statusGeral').value,
+    percentualFisico: document.getElementById('percentualFisico').value,
+    contratada: document.getElementById('contratada').value.trim(),
+    etapaAtual: document.getElementById('etapaAtual').value.trim(),
+    prazoPrevisto: document.getElementById('prazoPrevisto').value,
+    previsaoAtual: document.getElementById('previsaoAtual').value,
+    efetivo: document.getElementById('efetivo').value.trim(),
+    situacaoMateriais: document.getElementById('situacaoMateriais').value,
+    pendencias: document.getElementById('pendencias').value.trim(),
+    observacoes: document.getElementById('observacoes').value.trim(),
+    linkFotos: document.getElementById('linkFotos').value.trim(),
+  };
+  if (!dados.statusGeral || dados.percentualFisico === '') {
+    toast('Preencha os campos obrigatórios', 'error');
+    return;
+  }
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Salvando...';
+  try {
+    await salvarRegistro(state.obraSelecionada.id, dados, state.fiscal);
+    toast('Atualização salva com sucesso!');
+    setTimeout(() => { state.view = 'obras'; render(); }, 1000);
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao salvar: ' + (e.message || 'Verifique sua conexão'), 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-device-floppy"></i> Salvar atualização';
+  }
+};
+
+window.voltarLista = function() { state.view = 'obras'; state.obraSelecionada = null; render(); };
+window.verHistorico = function() { state.view = 'historico'; render(); };
+
+async function renderHistorico() {
+  const app = document.getElementById('app');
+  app.innerHTML = `${renderHeader()}<div class="loading">Carregando histórico...</div>`;
+  const obra = state.obraSelecionada;
+  const registros = await carregarHistorico(obra.id);
+  const itensHtml = registros.length === 0
+    ? `<div class="empty-state"><i class="ti ti-inbox"></i><p>Nenhum registro encontrado</p></div>`
+    : registros.map((r, idx) => `
+        <div class="history-item">
+          <div class="history-meta">
+            <span><strong>${escapeHtml(r.fiscal)}</strong> · ${formatDate(r.atualizado_em)}</span>
+            ${idx === 0 ? '<span style="background:#EAF3DE;color:#3B6D11;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">MAIS RECENTE</span>' : ''}
+          </div>
+          <div class="history-content">
+            <div class="field-display"><strong>Status</strong><span>${labelStatus(r.status_geral)} — ${r.percentual_fisico || 0}% executado</span></div>
+            ${r.etapa_atual ? `<div class="field-display"><strong>Etapa</strong><span>${escapeHtml(r.etapa_atual)}</span></div>` : ''}
+            ${r.contratada ? `<div class="field-display"><strong>Contratada</strong><span>${escapeHtml(r.contratada)}</span></div>` : ''}
+            ${r.previsao_atual ? `<div class="field-display"><strong>Previsão de conclusão</strong><span>${formatDateOnly(r.previsao_atual)}</span></div>` : ''}
+            ${r.efetivo ? `<div class="field-display"><strong>Efetivo no canteiro</strong><span>${escapeHtml(r.efetivo)}</span></div>` : ''}
+            ${r.situacao_materiais ? `<div class="field-display"><strong>Materiais</strong><span>${escapeHtml(r.situacao_materiais)}</span></div>` : ''}
+            ${r.pendencias ? `<div class="field-display"><strong>Pendências</strong><span>${escapeHtml(r.pendencias)}</span></div>` : ''}
+            ${r.observacoes ? `<div class="field-display"><strong>Observações</strong><span>${escapeHtml(r.observacoes)}</span></div>` : ''}
+            ${r.link_fotos ? `<div class="field-display"><strong>Fotos</strong><span><a href="${escapeHtml(r.link_fotos)}" target="_blank" class="photo-link"><i class="ti ti-external-link"></i> Abrir link</a></span></div>` : ''}
+          </div>
+        </div>`).join('');
+  app.innerHTML = `
+    ${renderHeader()}
+    <button class="back-link" onclick="state.view='form'; render();"><i class="ti ti-arrow-left"></i> Voltar para o formulário</button>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-history"></i> Histórico de ${escapeHtml(obra.nome)}</div>
+      <div style="font-size: 13px; color: #5F5E5A; margin-bottom: 1rem;">${registros.length} ${registros.length === 1 ? 'registro' : 'registros'} no total</div>
+      ${itensHtml}
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
