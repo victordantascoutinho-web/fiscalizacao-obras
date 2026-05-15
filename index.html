@@ -72,9 +72,6 @@
   .field-display:last-child { border-bottom: none; }
   .field-display strong { display: block; font-size: 12px; color: #5F5E5A; margin-bottom: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
   .field-display span { font-size: 14px; color: #2c2c2a; }
-  .config-alert { background: #FCEBEB; border: 1px solid #F09595; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; color: #501313; }
-  .config-alert h3 { font-size: 14px; margin-bottom: 6px; }
-  .config-alert p { font-size: 13px; }
   .photo-link { display: inline-flex; align-items: center; gap: 4px; color: #185FA5; text-decoration: none; font-size: 13px; margin-right: 12px; margin-top: 6px; }
   .photo-link:hover { text-decoration: underline; }
   .help-text { font-size: 12px; color: #5F5E5A; margin-top: 4px; }
@@ -89,39 +86,27 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  CONFIGURAÇÃO — VOCÊ PRECISA PREENCHER ESTES 2 VALORES           ║
-// ║  Pegue eles no painel do Supabase (instruções no guia)           ║
-// ╚══════════════════════════════════════════════════════════════════╝
 const SUPABASE_URL = 'https://hafvlgjndsejthntkcyl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhZnZsZ2puZHNlanRobnRrY3lsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTAxODMsImV4cCI6MjA5NDQyNjE4M30.UP9e4QM2ooKWSmReGRO96maQ-m8H0hxUW1eqt-ydT9E';
-// ════════════════════════════════════════════════════════════════════
 
-let supabase = null;
-let CONFIGURADO = false;
-
-if (SUPABASE_URL && SUPABASE_URL !== 'COLE_AQUI_A_URL_DO_SUPABASE' &&
-    SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'COLE_AQUI_A_CHAVE_ANON_DO_SUPABASE') {
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  CONFIGURADO = true;
-}
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let state = { fiscal: null, view: 'login', obraSelecionada: null, obras: [] };
 
 async function carregarObras() {
-  const { data, error } = await supabase.from('obras').select('*').order('nome');
+  const { data, error } = await db.from('obras').select('*').order('nome');
   if (error) { console.error(error); return []; }
   return data || [];
 }
 
 async function carregarUltimoRegistro(obraId) {
-  const { data, error } = await supabase.from('registros').select('*').eq('obra_id', obraId).order('atualizado_em', { ascending: false }).limit(1);
+  const { data, error } = await db.from('registros').select('*').eq('obra_id', obraId).order('atualizado_em', { ascending: false }).limit(1);
   if (error) { console.error(error); return null; }
   return data && data[0] ? data[0] : null;
 }
 
 async function carregarHistorico(obraId) {
-  const { data, error } = await supabase.from('registros').select('*').eq('obra_id', obraId).order('atualizado_em', { ascending: false });
+  const { data, error } = await db.from('registros').select('*').eq('obra_id', obraId).order('atualizado_em', { ascending: false });
   if (error) { console.error(error); return []; }
   return data || [];
 }
@@ -129,10 +114,10 @@ async function carregarHistorico(obraId) {
 async function salvarRegistro(obraId, dados, fiscal) {
   const agora = new Date();
   const hoje = agora.toISOString().split('T')[0];
-  const { data: existentes } = await supabase.from('registros').select('id').eq('obra_id', obraId).eq('fiscal', fiscal).gte('atualizado_em', hoje + 'T00:00:00').lte('atualizado_em', hoje + 'T23:59:59');
+  const { data: existentes } = await db.from('registros').select('id').eq('obra_id', obraId).eq('fiscal', fiscal).gte('atualizado_em', hoje + 'T00:00:00').lte('atualizado_em', hoje + 'T23:59:59');
   if (existentes && existentes.length > 0) {
     const ids = existentes.map(r => r.id);
-    await supabase.from('registros').delete().in('id', ids);
+    await db.from('registros').delete().in('id', ids);
   }
   const novoRegistro = {
     obra_id: obraId, fiscal: fiscal, atualizado_em: agora.toISOString(),
@@ -143,13 +128,12 @@ async function salvarRegistro(obraId, dados, fiscal) {
     pendencias: dados.pendencias || null, observacoes: dados.observacoes || null,
     link_fotos: dados.linkFotos || null,
   };
-  const { error } = await supabase.from('registros').insert(novoRegistro);
+  const { error } = await db.from('registros').insert(novoRegistro);
   if (error) throw error;
   return novoRegistro;
 }
 
 async function init() {
-  if (!CONFIGURADO) { renderTelaConfiguracao(); return; }
   state.obras = await carregarObras();
   const fiscalSalvo = sessionStorage.getItem('fiscal_atual');
   if (fiscalSalvo) { state.fiscal = fiscalSalvo; state.view = 'obras'; }
@@ -187,23 +171,6 @@ function render() {
   else if (state.view === 'obras') renderObras();
   else if (state.view === 'form') renderForm();
   else if (state.view === 'historico') renderHistorico();
-}
-
-function renderTelaConfiguracao() {
-  document.getElementById('app').innerHTML = `
-    <div class="login-wrapper">
-      <div class="login-card" style="max-width: 520px; text-align: left;">
-        <div class="icon-big" style="margin: 0 auto 1rem;"><i class="ti ti-settings"></i></div>
-        <h2 style="text-align: center;">Configuração necessária</h2>
-        <p style="text-align: center;">O sistema ainda não está conectado ao banco de dados</p>
-        <div class="config-alert" style="margin-top: 1rem;">
-          <h3><i class="ti ti-info-circle"></i> O que fazer</h3>
-          <p style="margin-top: 6px;">Abra este arquivo num editor de texto (como o Bloco de Notas) e procure por <strong>SUPABASE_URL</strong> e <strong>SUPABASE_ANON_KEY</strong>.</p>
-          <p style="margin-top: 8px;">Substitua os valores entre aspas pelos que você copiou do painel do Supabase. Veja o guia de instalação para o passo a passo completo.</p>
-        </div>
-      </div>
-    </div>
-  `;
 }
 
 function renderLogin() {
